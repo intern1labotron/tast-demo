@@ -78,7 +78,11 @@ type (
 // DeleteProductImage implements Products.
 func (i *products) DeleteProductImage(ctx context.Context, productId, productImageId uint) error {
 	// begin tx
-	tx := i.db.BeginTx()
+	tx, err := i.db.BeginTx(ctx)
+	if err != nil {
+		i.logger.Error(err)
+		return errs.ErrInternal
+	}
 	// get product image
 	productImageModel, err := i.products.FindImage(ctx, tx, productImageId)
 	if err != nil {
@@ -165,12 +169,12 @@ func (i *products) UploadProductImages(ctx context.Context, userId, productId ui
 		if err != nil {
 			i.logger.Error(err)
 			rollback()
-			return nil, errs.HandleGorm(err)
+			return nil, errs.HandleSqlErr(err)
 		}
 		if err := i.products.CreateImage(ctx, nil, productId, imageModel.ID); err != nil {
 			i.logger.Error(err)
 			rollback()
-			return nil, errs.HandleGorm(err)
+			return nil, errs.HandleSqlErr(err)
 		}
 		success = append(success, imageModel)
 	}
@@ -198,7 +202,7 @@ func (i *products) GetProduct(ctx context.Context, id uint) (*ProductResponse, e
 	model, err := i.products.FindById(ctx, nil, id)
 	if err != nil {
 		i.logger.Error(err)
-		return nil, errs.HandleGorm(err)
+		return nil, errs.HandleSqlErr(err)
 	}
 	var res ProductResponse
 	if err := i.helper.ParseJson(model, &res); err != nil {
@@ -211,7 +215,7 @@ func (i *products) GetProducts(ctx context.Context, id uint, pg *helpers.Paginat
 	models, err := i.products.FindAll(ctx, nil, id, pg, f)
 	if err != nil {
 		i.logger.Error(err)
-		return nil, errs.HandleGorm(err)
+		return nil, errs.HandleSqlErr(err)
 	}
 	var res []ProductResponse
 	if err := i.helper.ParseJson(models, &res); err != nil {
@@ -226,7 +230,7 @@ func (i *products) CreateProducts(ctx context.Context, teamId uint, input *Creat
 		code, err := i.codeService.GenerateProductCode(ctx, teamId)
 		if err != nil {
 			i.logger.Error(err)
-			return nil, errs.HandleGorm(err)
+			return nil, errs.HandleSqlErr(err)
 		}
 		input.Code = code
 	}
@@ -244,11 +248,11 @@ func (i *products) CreateProducts(ctx context.Context, teamId uint, input *Creat
 	productModel, err := i.products.Create(ctx, nil, teamId, &body)
 	if err != nil {
 		i.logger.Error(err)
-		return nil, errs.HandleGorm(err)
+		return nil, errs.HandleSqlErr(err)
 	}
 	if err := i.helper.ParseJson(productModel, &res); err != nil {
 		i.logger.Error(err)
-		return nil, errs.HandleGorm(err)
+		return nil, errs.HandleSqlErr(err)
 	}
 	return res, nil
 }
@@ -264,14 +268,14 @@ func (i *products) UpdateProducts(ctx context.Context, id uint, input *UpdatePro
 	body := repository.UpdateProductsRequest(data)
 	if err := i.products.Save(ctx, nil, id, &body); err != nil {
 		i.logger.Error(err)
-		return errs.HandleGorm(err)
+		return errs.HandleSqlErr(err)
 	}
 	return nil
 }
 func (i *products) DeleteProducts(ctx context.Context, id uint) error {
 	if err := i.products.DeleteById(ctx, nil, id); err != nil {
 		i.logger.Error(err)
-		return errs.HandleGorm(err)
+		return errs.HandleSqlErr(err)
 	}
 	return nil
 }

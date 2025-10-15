@@ -1,0 +1,73 @@
+name: Lint Code
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  lint-backend:
+    name: Lint Go Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+          cache-dependency-path: apps/backend/go.sum
+
+      - name: Install golangci-lint
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.61.0
+          echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+      - name: Run golangci-lint
+        working-directory: apps/backend
+        run: golangci-lint run --timeout=5m
+
+      - name: Run go vet
+        working-directory: apps/backend
+        run: go vet ./...
+
+      - name: Check formatting
+        working-directory: apps/backend
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "The following files are not formatted:"
+            gofmt -s -l .
+            exit 1
+          fi
+
+  lint-frontend:
+    name: Lint React Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: apps/www/package-lock.json
+
+      - name: Install dependencies
+        working-directory: apps/www
+        run: npm ci
+
+      - name: Run ESLint
+        working-directory: apps/www
+        run: npm run lint
+
+      - name: Type check
+        working-directory: apps/www
+        run: npx tsc --noEmit
